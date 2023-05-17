@@ -1,0 +1,127 @@
+module GameController(Clock, Reset, Access, Button, TimeUp, Enable, Reconfig, LoadIn, LoadOut, RNGIn, RNGOut, LogOff);
+	input Access;
+	input Clock, Reset;
+	input Button;
+	input TimeUp;
+	input LoadIn;
+	input RNGIn;
+
+	output Enable;
+	output LoadOut;
+	output Reconfig;
+	output RNGOut;
+	output LogOff;
+
+	reg Enable;
+	reg LoadOut;
+	reg Reconfig;
+	reg RNGOut;
+	reg LogOff;
+
+	parameter WAIT = 0, PASSED = 1, START = 2, GAMEPLAY = 3, GAMEOVER = 4;
+	reg [2:0] State;
+	reg count;
+
+	always @ (posedge Clock)
+		begin
+			if(Reset == 1'b0)
+				begin
+					Enable <= 1'b0;
+					LoadOut <= 1'b0;
+					Reconfig <= 1'b0;
+					RNGOut <= 1'b0;
+					LogOff <= 1'b0;
+					count <= 1'b0;
+				end
+			else
+				begin
+					case (State)
+					WAIT:
+						begin
+							LogOff <= 1'b0;
+							if(count == 1'b1)
+								begin
+									if(Access == 1'b1)
+										begin
+											State <= PASSED;
+										end
+									else
+										begin
+											State <= WAIT;
+										end
+									count <= 1'b0;
+								end
+							else 
+								begin
+									count <= count + 1;
+								end
+						end
+					PASSED:
+						begin
+							Reconfig <= 1'b1;
+							State <= START;
+						end
+					START:
+						begin
+							Reconfig <= 1'b0;
+							if(Button == 1'b1)
+								begin
+									Enable <= 1'b1;
+									State <= GAMEPLAY;
+								end
+							else if(LoadIn == 1'b1)
+								begin
+									LogOff <= 1'b1;  //Signal sent to the access controller to turn access off
+									State <= WAIT;
+								end
+							else
+								begin
+									State <= START;
+								end
+						end
+					GAMEPLAY:
+						begin
+							//Give Access
+							LoadOut <= LoadIn;
+							RNGOut <= RNGIn;
+							
+							if(TimeUp == 1'b0)
+								begin
+									Enable <= 1'b0;
+									State <= GAMEOVER;
+								end
+							else 
+								begin
+									State <= GAMEPLAY;
+								end
+						end
+					GAMEOVER:
+						begin
+							LoadOut <= 1'b0;
+							RNGOut <= 1'b0;
+							if(Button == 1'b1)
+								begin
+									State <= PASSED;
+								end
+							else if(LoadIn == 1'b1)
+								begin
+									LogOff <= 1'b1;
+									State <= WAIT;
+								end
+							else 
+								begin
+									State <= GAMEOVER;
+								end
+							
+						end
+					default: 
+						begin
+							LoadOut <= 1'b0;
+							RNGOut <= 1'b0;
+							State <= WAIT;
+						end
+					endcase
+				end
+		end
+	
+endmodule
